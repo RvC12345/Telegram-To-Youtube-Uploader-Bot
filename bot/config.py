@@ -4,7 +4,7 @@ class Config:
 
     BOT_TOKEN = os.environ.get('tk')
 
-    SESSION_NAME = "ytuper"
+    SESSION_NAME = "bot"
 
     API_ID = os.environ.get('apiid')
 
