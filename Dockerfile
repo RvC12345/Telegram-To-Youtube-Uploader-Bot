@@ -1,4 +1,5 @@
-FROM harshpreets63/random:simple
+#FROM harshpreets63/random:simple
+FROM python:3.9.2
 
 WORKDIR /usr/src/app
 
