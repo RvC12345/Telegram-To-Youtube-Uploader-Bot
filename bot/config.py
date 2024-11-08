@@ -2,19 +2,19 @@ import os
 
 class Config:
 
-    BOT_TOKEN = ""
+    BOT_TOKEN = os.environ.get('tk')
 
-    SESSION_NAME = ""
+    SESSION_NAME = "ytuper"
 
-    API_ID = ""
+    API_ID = os.environ.get('apiid')
 
-    API_HASH = ""
+    API_HASH = os.environ.get('apihash')
 
-    CLIENT_ID = ""
+    CLIENT_ID = os.environ.get('client_id')
 
-    CLIENT_SECRET = ""
+    CLIENT_SECRET = os.environ.get('client_secret')
 
-    AUTH_USERS = [942731625]
+    AUTH_USERS = [1387186514]
 
     VIDEO_DESCRIPTION = ""
 
