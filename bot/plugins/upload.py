@@ -79,6 +79,9 @@ async def _upload(c: UtubeBot, m: Message):
         c.counter -= 1
         c.counter = max(0, c.counter)
     await snt.edit_text(link)
+    #delete if downloaded file still exists...
+    if os.path.exists(file):
+        os.remove(file)
 
 
 def get_download_id(storage: dict) -> str:
