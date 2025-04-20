@@ -5,6 +5,10 @@ import random
 import logging
 import asyncio
 import datetime
+import yt-dlp
+import aiohttp
+import math
+import traceback
 from typing import Tuple, Union
 
 from pyrogram import StopTransmission
@@ -20,6 +24,55 @@ from ..utubebot import UtubeBot
 
 log = logging.getLogger(__name__)
 
+@UtubeBot.on_message(
+    Filters.private & Filters.command("uploadurl") & Filters.user(Config.AUTH_USERS)
+)
+async def _upload_url(c: UtubeBot, m: Message):
+    if not os.path.exists(Config.CRED_FILE):
+        await m.reply_text(tr.NOT_AUTHENTICATED_MSG, True)
+        return
+
+    parts = m.text.split(" ", 2)
+    if len(parts) < 2:
+        return await m.reply_text("Usage: `/uploadurl <url> <optional title>`", True)
+
+    url = parts[1]
+    title = parts[2] if len(parts) > 2 else "Uploaded via URL"
+    snt = await m.reply_text("Processing your request...", True)
+
+    download_id = get_download_id(c.download_controller)
+    c.download_controller[download_id] = True
+    file_path = f"url_{int(time.time())}.mp4"
+    start_time = time.time()
+
+    try:
+        if url.endswith(".mp4") or ".mp4?" in url:
+            await download_direct_url(url, file_path, snt, c, download_id, start_time)
+        else:
+            await snt.edit_text("Using yt-dlp to extract and download...")
+            ydl_opts = {
+                'outtmpl': file_path,
+                'format': 'best',
+                'merge_output_format': 'mp4',
+                'quiet': True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+
+        await snt.edit_text("Downloaded successfully. Now uploading to YouTube...")
+
+        upload = Uploader(file_path, title)
+        status, link = await upload.start(progress, snt)
+        await snt.edit_text(link if status else f"Upload Failed:\n{link}")
+
+    except Exception as e:
+        err = traceback.format_exc()
+        await snt.edit_text(f"Error: {str(e)}\n\n{err[-1000:]}")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        c.download_controller.pop(download_id, None)
+        
 
 @UtubeBot.on_message(
     Filters.private
@@ -117,6 +170,45 @@ def human_bytes(
             return f"{round(num, 2)} {unit}"
         num /= base
 
+async def download_direct_url(url, filename, snt, c, download_id, start_time):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            total = int(resp.headers.get('Content-Length', 0))
+            chunk_size = 1024 * 512
+            done = 0
+            last_update = time.time()
+
+            with open(filename, "wb") as f:
+                async for chunk in resp.content.iter_chunked(chunk_size):
+                    if not c.download_controller.get(download_id):
+                        raise StopTransmission
+                    f.write(chunk)
+                    done += len(chunk)
+
+                    now = time.time()
+                    if now - last_update > 10 or done == total:
+                        try:
+                            percent = round((done * 100) / total, 2)
+                            speed, unit = human_bytes(done / (now - start_time), True)
+                            curr = human_bytes(done)
+                            tott = human_bytes(total)
+                            eta = datetime.timedelta(seconds=int(((total - done) / (1024 * 1024)) / speed))
+                            elapsed = datetime.timedelta(seconds=int(now - start_time))
+
+                            text = (
+                                f"Downloading from URL...\n\n"
+                                f"{percent}% done.\n{curr} of {tott}\n"
+                                f"Speed: {speed} {unit}/s\nETA: {eta}\nElapsed: {elapsed}"
+                            )
+                            await snt.edit_text(
+                                text=text,
+                                reply_markup=InlineKeyboardMarkup(
+                                    [[InlineKeyboardButton("Cancel", f"cncl+{download_id}")]]
+                                ),
+                            )
+                            last_update = now
+                        except Exception:
+                            pass
 
 async def progress(
     cur: Union[int, float],
@@ -153,3 +245,6 @@ async def progress(
     except Exception as e:
         log.info(e)
         pass
+
+
+            
