@@ -5,7 +5,7 @@ import random
 import logging
 import asyncio
 import datetime
-import yt-dlp
+import yt_dlp
 import aiohttp
 import math
 import traceback
